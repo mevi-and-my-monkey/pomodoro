@@ -3,12 +3,14 @@ package com.mevi.pomodoro
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -18,14 +20,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.mevi.pomodoro.R
 
 @Composable
 fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
@@ -33,11 +36,33 @@ fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
     val pomodoroState by pomodoroViewModel.pomodoroState
     val isRunning by pomodoroViewModel.isRunning
 
+    // La imagen cambia según el estado del temporizador.
+    val imageResource = when (pomodoroState) {
+        PomodoroState.WORKING -> R.drawable.pomodoro_dog_one
+        PomodoroState.BREAK -> R.drawable.pomodoro_dog_three
+    }
+
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            )
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.SpaceAround
     ) {
+        Image(
+            painter = painterResource(id = imageResource),
+            contentDescription = "Cute Maltese dog",
+            modifier = Modifier.size(550.dp)
+        )
+
         when (pomodoroState) {
             PomodoroState.WORKING -> {
                 CircularTimer(
@@ -48,7 +73,14 @@ fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
                 )
             }
             PomodoroState.BREAK -> {
-                BreakScreen()
+                Text(
+                    text = "Time for a break!",
+                    style = TextStyle(
+                        fontFamily = FontFamily.Cursive,
+                        fontSize = 32.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+                    )
+                )
             }
         }
     }
@@ -92,19 +124,5 @@ fun CircularTimer(
                 Text(text = "Reset")
             }
         }
-    }
-}
-
-@Composable
-fun BreakScreen() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(text = "Time for a break!", fontSize = 30.sp)
-        Spacer(modifier = Modifier.height(20.dp))
-        // Placeholder for the cute dog image. 
-        // Recommended: Use a soft, dreamy, warm-lit illustration or vector art.
-        Image(painter = painterResource(id = R.drawable.ic_launcher_foreground), contentDescription = "Cute dog")
     }
 }

@@ -37,7 +37,8 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun PomodoroTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    // Desactivamos el color dinámico para forzar nuestra paleta personalizada.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
