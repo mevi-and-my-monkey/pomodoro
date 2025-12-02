@@ -1,5 +1,7 @@
 package com.mevi.pomodoro
 
+import android.media.AudioManager
+import android.media.ToneGenerator
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -12,12 +14,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -36,7 +44,27 @@ fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
     val pomodoroState by pomodoroViewModel.pomodoroState
     val isRunning by pomodoroViewModel.isRunning
 
-    // La imagen cambia según el estado del temporizador.
+    val isInitialComposition = remember { mutableStateOf(true) }
+    val toneGen = remember { ToneGenerator(AudioManager.STREAM_ALARM, 100) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            toneGen.release()
+        }
+    }
+
+    LaunchedEffect(pomodoroState) {
+        if (isInitialComposition.value) {
+            isInitialComposition.value = false
+        } else {
+            val toneType = when (pomodoroState) {
+                PomodoroState.BREAK -> ToneGenerator.TONE_CDMA_HIGH_L
+                PomodoroState.WORKING -> ToneGenerator.TONE_SUP_RADIO_ACK
+            }
+            toneGen.startTone(toneType, 200)
+        }
+    }
+
     val imageResource = when (pomodoroState) {
         PomodoroState.WORKING -> R.drawable.pomodoro_dog_one
         PomodoroState.BREAK -> R.drawable.pomodoro_dog_three
@@ -53,15 +81,18 @@ fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
                     )
                 )
             )
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceAround
+        verticalArrangement = Arrangement.Center
     ) {
         Image(
             painter = painterResource(id = imageResource),
             contentDescription = "Cute Maltese dog",
-            modifier = Modifier.size(550.dp)
+            modifier = Modifier.size(450.dp)
         )
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         when (pomodoroState) {
             PomodoroState.WORKING -> {
@@ -83,6 +114,8 @@ fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
