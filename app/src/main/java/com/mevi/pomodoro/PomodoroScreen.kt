@@ -1,7 +1,12 @@
 package com.mevi.pomodoro
 
+import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -23,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -40,12 +47,24 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
-    val time by pomodoroViewModel.time
-    val pomodoroState by pomodoroViewModel.pomodoroState
-    val isRunning by pomodoroViewModel.isRunning
+    val time by pomodoroViewModel.time.collectAsState()
+    val pomodoroState by pomodoroViewModel.pomodoroState.collectAsState()
+    val isRunning by pomodoroViewModel.isRunning.collectAsState()
+
+    val context = LocalContext.current
+
+    DisposableEffect(Unit) {
+        val serviceIntent = Intent(context, TimerService::class.java)
+        context.startService(serviceIntent)
+        pomodoroViewModel.bindService(context)
+
+        onDispose {
+            pomodoroViewModel.unbindService(context)
+        }
+    }
 
     val isInitialComposition = remember { mutableStateOf(true) }
-    val toneGen = remember { ToneGenerator(AudioManager.STREAM_ALARM, 100) }
+    val toneGen = remember { ToneGenerator(AudioManager.STREAM_MUSIC, 100) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -57,6 +76,7 @@ fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
         if (isInitialComposition.value) {
             isInitialComposition.value = false
         } else {
+            vibrate(context)
             val toneType = when (pomodoroState) {
                 PomodoroState.BREAK -> ToneGenerator.TONE_CDMA_HIGH_L
                 PomodoroState.WORKING -> ToneGenerator.TONE_SUP_RADIO_ACK
@@ -103,6 +123,7 @@ fun PomodoroScreen(pomodoroViewModel: PomodoroViewModel = viewModel()) {
                     onReset = { pomodoroViewModel.reset() }
                 )
             }
+
             PomodoroState.BREAK -> {
                 Text(
                     text = "Time for a break!",
@@ -150,12 +171,28 @@ fun CircularTimer(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = "%02d:%02d".format(time / 60, time % 60), fontSize = 60.sp)
             Spacer(modifier = Modifier.height(20.dp))
-            Button(onClick = onStartStop, colors = ButtonDefaults.buttonColors(containerColor = primaryColor)) {
+            Button(
+                onClick = onStartStop,
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+            ) {
                 Text(text = if (isRunning) "Stop" else "Start")
             }
-            Button(onClick = onReset, colors = ButtonDefaults.buttonColors(containerColor = primaryColor)) {
+            Button(
+                onClick = onReset,
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+            ) {
                 Text(text = "Reset")
             }
         }
+    }
+}
+
+private fun vibrate(context: Context) {
+    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
+    } else {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(200)
     }
 }

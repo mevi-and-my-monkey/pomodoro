@@ -1,59 +1,74 @@
 package com.mevi.pomodoro
 
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
-enum class PomodoroState {
-    WORKING,
-    BREAK
-}
+// Importación que faltaba
+import com.mevi.pomodoro.PomodoroState
 
 class PomodoroViewModel : ViewModel() {
 
-    private val _pomodoroState = mutableStateOf(PomodoroState.WORKING)
-    val pomodoroState: State<PomodoroState> = _pomodoroState
+    private var timerService: TimerService? = null
+    private var isBound = false
 
-    private val _time = mutableStateOf(25 * 60)
-    val time: State<Int> = _time
+    private val _time = MutableStateFlow(25 * 60)
+    val time = _time.asStateFlow()
 
-    private val _isRunning = mutableStateOf(false)
-    val isRunning: State<Boolean> = _isRunning
+    private val _pomodoroState = MutableStateFlow(PomodoroState.WORKING)
+    val pomodoroState = _pomodoroState.asStateFlow()
 
-    private var timerJob: Job? = null
+    private val _isRunning = MutableStateFlow(false)
+    val isRunning = _isRunning.asStateFlow()
 
-    fun startStop() {
-        if (_isRunning.value) {
-            timerJob?.cancel()
-            _isRunning.value = false
-        } else {
-            _isRunning.value = true
-            timerJob = viewModelScope.launch {
-                while (_time.value > 0) {
-                    delay(1000)
-                    _time.value--
-                }
-                // When time is up, change state
-                if (_pomodoroState.value == PomodoroState.WORKING) {
-                    _pomodoroState.value = PomodoroState.BREAK
-                    _time.value = 5 * 60 // 5 minutes break
-                } else {
-                    _pomodoroState.value = PomodoroState.WORKING
-                    _time.value = 25 * 60 // 25 minutes work
-                }
-                _isRunning.value = false
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            val binder = service as TimerService.TimerBinder
+            timerService = binder.getService()
+            isBound = true
+
+            // Suscribirse a los cambios del servicio
+            viewModelScope.launch {
+                timerService?.time?.collect { _time.value = it }
             }
+            viewModelScope.launch {
+                timerService?.pomodoroState?.collect { _pomodoroState.value = it }
+            }
+            viewModelScope.launch {
+                timerService?.isRunning?.collect { _isRunning.value = it }
+            }
+        }
+
+        override fun onServiceDisconnected(arg0: ComponentName) {
+            timerService = null
+            isBound = false
         }
     }
 
+    fun startStop() {
+        timerService?.startStop()
+    }
+
     fun reset() {
-        timerJob?.cancel()
-        _isRunning.value = false
-        _pomodoroState.value = PomodoroState.WORKING
-        _time.value = 25 * 60
+        timerService?.resetTimer()
+    }
+
+    fun bindService(context: Context) {
+        Intent(context, TimerService::class.java).also { intent ->
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        }
+    }
+
+    fun unbindService(context: Context) {
+        if (isBound) {
+            context.unbindService(connection)
+            isBound = false
+        }
     }
 }
