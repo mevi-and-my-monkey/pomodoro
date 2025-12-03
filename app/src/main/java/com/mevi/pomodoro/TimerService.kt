@@ -52,7 +52,7 @@ class TimerService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createNotificationChannel()
-        val notification = createNotification("Pomodoro session is running...")
+        val notification = createNotification("Pomodoro", "session is running...")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -77,11 +77,11 @@ class TimerService : Service() {
 
     private fun startTimer() {
         _isRunning.value = true
+        updateNotification("Started")
         timerJob = scope.launch {
             while (_time.value > 0) {
                 delay(1000)
                 _time.value--
-                updateNotification()
             }
 
             vibrateStrong()
@@ -90,9 +90,11 @@ class TimerService : Service() {
             if (_pomodoroState.value == PomodoroState.WORKING) {
                 _pomodoroState.value = PomodoroState.BREAK
                 _time.value = 5 * 60
+                updateNotification("Break started")
             } else {
                 _pomodoroState.value = PomodoroState.WORKING
                 _time.value = 25 * 60
+                updateNotification("Work started")
             }
 
             _isRunning.value = false
@@ -103,13 +105,14 @@ class TimerService : Service() {
     private fun pauseTimer() {
         timerJob?.cancel()
         _isRunning.value = false
+        updateNotification("Paused")
     }
 
     fun resetTimer() {
         pauseTimer()
         _pomodoroState.value = PomodoroState.WORKING
         _time.value = 25 * 60
-        updateNotification()
+        updateNotification("Reset")
     }
 
     // ============================================================
@@ -140,14 +143,14 @@ class TimerService : Service() {
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
 
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
         }
     }
 
-    private fun createNotification(text: String): Notification {
+    private fun createNotification(title: String, text: String): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Pomodoro")
+            .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -156,12 +159,21 @@ class TimerService : Service() {
             .build()
     }
 
-    private fun updateNotification() {
-        val stateName = _pomodoroState.value.name.lowercase().replaceFirstChar { it.uppercase() }
-        val text = "%s - %02d:%02d".format(stateName, _time.value / 60, _time.value % 60)
+    private fun updateNotification(action: String? = null) {
 
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(NOTIFICATION_ID, createNotification(text))
+        val stateName = _pomodoroState.value.name.lowercase().replaceFirstChar { it.uppercase() }
+        val timeFormatted = "%02d:%02d".format(_time.value / 60, _time.value % 60)
+
+        val title = when {
+            action != null -> action            // Pause, Reset, Stop
+            _isRunning.value -> stateName       // Working, Break
+            else -> "Paused"                    // default
+        }
+
+        val text = "$stateName - $timeFormatted"
+
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID, createNotification(title, text))
     }
 
     // ============================================================
